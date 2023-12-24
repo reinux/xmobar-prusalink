@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
-module MK4Monitor
-  ( MK4 (MK4), mk4Netrc ) where
+module PrusaLinkMonitor
+  ( PrusaLink (PrusaLink), prusaLinkNetrc ) where
 
 import Xmobar
     ( Exec (start, alias) )
@@ -14,7 +14,6 @@ import Data.Aeson.Types (ToJSON)
 import Data.ByteString (fromStrict)
 import GHC.Generics (Generic)
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.Text as T (unpack)
 import Network.NetRc (readUserNetRc, nrHosts, NetRcHost (nrhName, nrhLogin, nrhPassword))
 import Data.List (find)
 import Data.ByteString.Char8 (unpack)
@@ -22,7 +21,7 @@ import Debug.Trace (traceShow, trace)
 
 -- https://github.com/snoyberg/http-client/blob/master/TUTORIAL.md
 -- https://hackage.haskell.org/package/http-client-tls-0.3.6.3/docs/Network-HTTP-Client-TLS.html
-data MK4 = MK4 String String String
+data PrusaLink = PrusaLink String String String
   deriving (Show, Read)
 
 data Status = Status
@@ -108,8 +107,8 @@ getStatus host username password = do
   resp <- httpBS =<< req'
   return (fromStrict $ getResponseBody resp)
 
-mk4Netrc :: String -> IO (Maybe MK4)
-mk4Netrc host = do
+prusaLinkNetrc :: String -> IO (Maybe PrusaLink)
+prusaLinkNetrc host = do
   hosts <- readUserNetRc
   return $
     case hosts of
@@ -118,13 +117,13 @@ mk4Netrc host = do
       Just (Right netrc) ->
         traceShow netrc $
         find ((== host) . unpack . nrhName) (nrHosts netrc)
-        >>= (\h -> Just $ MK4 host ((unpack . nrhLogin) h) ((unpack . nrhPassword) h))
+        >>= (\h -> Just $ PrusaLink host ((unpack . nrhLogin) h) ((unpack . nrhPassword) h))
 
-instance Exec MK4 where
-  start (MK4 host login password) callback = do
+instance Exec PrusaLink where
+  start (PrusaLink host login password) callback = do
     bytes <- getStatus host login password
     let status = eitherDecode bytes :: Either String Status
     case status of
       Left e -> callback ("Error: " ++ e)
       Right s -> callback (show $ state $ printer s)
-  alias (MK4 host _ _) = host
+  alias (PrusaLink host _ _) = host
