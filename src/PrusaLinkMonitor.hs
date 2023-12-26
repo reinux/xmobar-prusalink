@@ -4,7 +4,7 @@ module PrusaLinkMonitor
   ( PrusaLink (PrusaLink), prusaLinkNetrc ) where
 
 import Xmobar
-    ( Exec (start, alias) )
+    ( Exec (alias, rate, run) )
 import Data.Aeson ( FromJSON(parseJSON), eitherDecode, Value(..) )
 import Network.HTTP.Simple
     ( parseRequest, getResponseBody, httpBS )
@@ -40,7 +40,7 @@ data Storage = Storage
 
 data Job = Job
   { id :: Integer
-  , progress :: Float
+  , progress :: Integer
   , time_remaining :: Integer
   , time_printing :: Integer
   }
@@ -52,9 +52,9 @@ data Printer = Printer
   , target_bed :: Float
   , temp_nozzle :: Float
   , target_nozzle :: Float
-  , axis_x :: Float
-  , axis_y :: Float
-  , axis_z :: Float
+  , axis_x :: Maybe Float
+  , axis_y :: Maybe Float
+  , axis_z :: Maybe Float
   , flow   :: Float
   , speed  :: Float
   , fan_hotend :: Float
@@ -72,7 +72,7 @@ data State =
   | Error
   | Attention
   | Ready
-  deriving (Generic, Show)
+  deriving (Generic, Show, Eq)
 
 instance FromJSON Status
 instance ToJSON Status
@@ -107,12 +107,28 @@ getStatus host username password = do
   resp <- httpBS =<< req'
   return (fromStrict $ getResponseBody resp)
 
+readableFormatSeconds :: (Show a, Integral a) => a -> [Char]
+readableFormatSeconds seconds =
+  (if seconds >= 60 * 60 then
+    show (seconds `div` (60 * 60)) ++ "h"
+   else ""
+  ) ++
+  (if seconds >= 60 then
+    show (seconds `mod` (60 * 60) `div` 60) ++ "m"
+   else ""
+  ) ++
+  (if seconds < 60 * 60 then
+    show (seconds `mod` 60) ++ "s"
+   else ""
+  )
+
+
 prusaLinkNetrc :: String -> IO (Maybe PrusaLink)
 prusaLinkNetrc host = do
   hosts <- readUserNetRc
   return $
     case hosts of
-      Nothing -> trace "readUserNetRc returned Nothing" Nothing
+      Nothing -> Nothing
       Just (Left e) -> trace ("readUserNetRc error: " ++ show e) Nothing
       Just (Right netrc) ->
         traceShow netrc $
@@ -120,10 +136,28 @@ prusaLinkNetrc host = do
         >>= (\h -> Just $ PrusaLink host ((unpack . nrhLogin) h) ((unpack . nrhPassword) h))
 
 instance Exec PrusaLink where
-  start (PrusaLink host login password) callback = do
-    bytes <- getStatus host login password
-    let status = eitherDecode bytes :: Either String Status
-    case status of
-      Left e -> callback ("Error: " ++ e)
-      Right s -> callback (show $ state $ printer s)
+  run (PrusaLink host login password) = do
+      bytes <- getStatus host login password
+      let status = eitherDecode bytes :: Either String Status
+      
+      case status of
+        Left e -> return $ "Error: " ++ e
+        Right s ->
+          return $
+          case job s of
+            Just jorb ->
+              if state (printer s) == Printing then
+                show (progress jorb)
+                ++ "% ("
+                ++ readableFormatSeconds (time_remaining jorb)
+                ++ ")"
+              else
+                show (state $ printer s)
+                ++ " "
+                ++ show (progress jorb)
+                ++ "%"
+            Nothing ->
+              show $ state $ printer s
+
   alias (PrusaLink host _ _) = host
+  rate _ = 100
