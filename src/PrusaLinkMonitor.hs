@@ -131,7 +131,6 @@ prusaLinkNetrc host = do
       Nothing -> Nothing
       Just (Left e) -> trace ("readUserNetRc error: " ++ show e) Nothing
       Just (Right netrc) ->
-        traceShow netrc $
         find ((== host) . unpack . nrhName) (nrHosts netrc)
         >>= (\h -> Just $ PrusaLink host ((unpack . nrhLogin) h) ((unpack . nrhPassword) h))
 
