@@ -1,2 +1,2 @@
-# xmonad-prusalink
-PrusaLink monitor plugin for xmonad
+# xmobar-prusalink
+PrusaLink monitor plugin for xmobar
