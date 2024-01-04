@@ -109,18 +109,21 @@ getStatus host username password = do
 
 readableFormatSeconds :: (Show a, Integral a) => a -> [Char]
 readableFormatSeconds seconds =
-  (if seconds >= 60 * 60 then
-    show (seconds `div` (60 * 60)) ++ "h"
-   else ""
-  ) ++
-  (if seconds >= 60 then
-    show (seconds `mod` (60 * 60) `div` 60) ++ "m"
-   else ""
-  ) ++
-  (if seconds < 60 * 60 then
-    show (seconds `mod` 60) ++ "s"
-   else ""
-  )
+  if seconds == 0 then
+    "< 1m"
+  else
+    (if seconds >= 60 * 60 then
+      show (seconds `div` (60 * 60)) ++ "h"
+     else ""
+    ) ++
+    (if seconds >= 60 then
+      show (seconds `mod` (60 * 60) `div` 60) ++ "m"
+     else ""
+    ) ++
+    (if seconds < 60 * 60 then
+      show (seconds `mod` 60) ++ "s"
+     else ""
+    )
 
 
 prusaLinkNetrc :: String -> IO (Maybe PrusaLink)
